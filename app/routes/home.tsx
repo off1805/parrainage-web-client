@@ -1,13 +1,20 @@
+import { Link } from "react-router";
 import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
-  ];
+  return [{ title: "Parrainage" }];
 }
 
 export default function Home() {
-  return <Welcome />;
+  return (
+    <div className="center">
+      <span className="script big">Parrainage</span>
+      <p className="lead">Choisis ton écran</p>
+      <nav className="links">
+        <Link to="/show?demo=1">Répétition (mode démo)</Link>
+        <Link to="/show">Le show (dernière session)</Link>
+        <Link to="/remote">Télécommande</Link>
+      </nav>
+    </div>
+  );
 }

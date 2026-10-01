@@ -2,6 +2,6 @@ import type { Config } from "@react-router/dev/config";
 
 export default {
   // Config options...
-  // Server-side render by default, to enable SPA mode set this to `false`
-  ssr: true,
+  // Mode SPA : le front utilise localStorage, BroadcastChannel et le plein écran côté navigateur
+  ssr: false,
 } satisfies Config;
