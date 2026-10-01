@@ -1,4 +1,3 @@
-import { getAdminKey } from './adminKey';
 import type {
   ConstraintType,
   ImportResult,
@@ -29,7 +28,6 @@ interface FetchOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: any;
   isFormData?: boolean;
-  public?: boolean;
 }
 
 async function request<T>(path: string, options: FetchOptions = {}): Promise<T> {
@@ -37,13 +35,6 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
   
   if (BASE.includes('ngrok')) {
     headers.set('ngrok-skip-browser-warning', '1');
-  }
-
-  if (!options.public) {
-    const key = getAdminKey();
-    if (key) {
-      headers.set('X-API-Key', key);
-    }
   }
 
   if (options.body && !options.isFormData) {
@@ -93,17 +84,19 @@ export const api = {
     },
     get: (id: string) => request<Student>(`/students/${id}`),
     update: (id: string, patch: Partial<Omit<Student, 'id' | 'email' | 'level' | 'createdAt' | 'updatedAt'>>) => request<Student>(`/students/${id}`, { method: 'PATCH', body: patch }),
-    import: (file: File) => {
+    import: (file: File, options: { level?: StudentLevel; maxMentees?: number } = {}) => {
       const fd = new FormData();
       fd.append('file', file);
+      if (options.level) fd.append('level', options.level);
+      if (options.maxMentees) fd.append('maxMentees', String(options.maxMentees));
       return request<ImportResult>('/students/import', { method: 'POST', body: fd, isFormData: true });
     },
   },
   invitations: {
     send: (studentId: string) => request<InvitationResult>(`/students/${studentId}/invitations`, { method: 'POST' }),
     resend: (studentId: string) => request<InvitationResult>(`/students/${studentId}/invitations/resend`, { method: 'POST' }),
-    verify: (token: string) => request<InvitationPreview>(`/invitations/verify?token=${encodeURIComponent(token)}`, { public: true }),
-    complete: (payload: { token: string; profilePictureUrl: string; whatsapp: string }) => request<InvitationPreview>('/invitations/complete', { method: 'POST', body: payload, public: true }),
+    verify: (token: string) => request<InvitationPreview>(`/invitations/verify?token=${encodeURIComponent(token)}`),
+    complete: (payload: { token: string; profilePictureUrl: string; whatsapp: string }) => request<InvitationPreview>('/invitations/complete', { method: 'POST', body: payload }),
   },
   constraints: {
     list: (type?: ConstraintType) => {

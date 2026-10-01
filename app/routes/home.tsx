@@ -13,7 +13,9 @@ export default function Home() {
       <nav className="links">
         <Link to="/show?demo=1">Répétition (mode démo)</Link>
         <Link to="/show">Le show (dernière session)</Link>
+        <Link to="/show-v2">Le show · version code</Link>
         <Link to="/remote">Télécommande</Link>
+        <Link to="/admin">Administration</Link>
       </nav>
     </div>
   );

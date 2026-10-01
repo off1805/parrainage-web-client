@@ -10,6 +10,16 @@ export const sound = {
     if (!amb) { amb = new Audio('/audio/ambiance.mp3'); amb.loop = true; amb.volume = 0.35; }
     if (on) void amb.play().catch(() => {}); else amb.pause();
   },
+  /** Bip court d'ordinateur, utilisé pendant la recherche du filleul. */
+  tick(freq = 1400) {
+    if (!ctx || !sound.on) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'square'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.025, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.06);
+  },
   chime() {
     if (!ctx || !sound.on) return;
     const t = ctx.currentTime;

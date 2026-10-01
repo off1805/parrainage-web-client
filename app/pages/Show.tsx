@@ -47,7 +47,7 @@ export default function Show() {
     (async () => {
       try {
         let list: Pairing[];
-        if (params.get('demo')) list = demoPairings();
+        if (params.get('demo')) list = demoPairings(Number(params.get('demo')));
         else {
           let id = params.get('session');
           if (!id) {
