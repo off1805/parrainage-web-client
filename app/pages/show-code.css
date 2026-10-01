@@ -111,6 +111,7 @@
   line-height: 1.05;
   color: var(--s-blue);
   text-shadow: 0 0 18px rgba(59, 130, 246, .25);
+  margin-bottom: clamp(1rem, 4vh, 3rem);
   animation: sv-glitch-in 1.4s steps(1) both;
 }
 .sv-ascii::after {
@@ -136,16 +137,14 @@
   94% { clip-path: inset(30% 0 45% 0); transform: translate(-2px, 2px); }
 }
 .sv-title { font-family: var(--s-mono); font-weight: 700; font-size: clamp(1.6rem, 4.2vw, 4.2rem); letter-spacing: -.03em; text-align: center; margin: 0; }
-.sv-boot { width: min(820px, 94vw); min-height: 12.5em; font-family: var(--s-mono); font-size: clamp(.78rem, 1.25vw, 1.2rem); line-height: 1.75; }
+.sv-boot { width: min(820px, 94vw); min-height: 7em; font-family: var(--s-mono); font-size: clamp(.78rem, 1.25vw, 1.2rem); line-height: 1.75; }
 .sv-boot p { display: flex; gap: 1rem; margin: 0; white-space: pre; }
 .sv-ln { color: #CBD5E1; width: 1.6em; text-align: right; flex: none; }
 .sv-boot-cmd { color: var(--s-blue); font-weight: 700; }
 .sv-boot-out { color: var(--s-muted); }
-.sv-boot-ok, .sv-boot-bar { color: var(--s-ink); }
+.sv-boot-ok { color: var(--s-ink); }
+.sv-boot-bar { color: var(--s-muted); }
 .sv-boot-cmt { color: var(--s-faint); font-style: italic; }
-.sv-bar-txt { color: var(--s-faint); }
-.sv-bar-txt b { color: var(--s-blue); font-weight: 400; }
-.sv-bar-pct { color: var(--s-amber); }
 .sv-run {
   font-family: var(--s-mono) !important; font-size: clamp(1rem, 1.5vw, 1.4rem) !important; font-weight: 700;
   padding: .9em 2em !important; border-radius: 12px !important; border: 0 !important;
@@ -165,10 +164,15 @@
 .sv-left { justify-self: end; }
 .sv-slot { justify-self: start; }
 
-.sv-card { display: flex; flex-direction: column; align-items: center; gap: 2vh; margin: 0; }
+.sv-card {
+  /* Largeur fixe : un nom long passe à la ligne au lieu d'élargir la carte et de décaler les cadres */
+  --card-w: clamp(170px, 21vw, 360px);
+  width: var(--card-w);
+  display: flex; flex-direction: column; align-items: center; gap: 2vh; margin: 0;
+}
 .sv-photo {
   position: relative;
-  width: clamp(170px, 21vw, 360px); aspect-ratio: 4 / 5;
+  width: 100%; aspect-ratio: 4 / 5; flex: none;
   border-radius: 18px; background: var(--s-soft);
   display: grid; place-items: center;
   box-shadow: 0 1px 2px rgba(15, 23, 42, .05), 0 24px 50px -24px rgba(29, 78, 216, .35);
@@ -198,10 +202,17 @@
 .sv-card.accent .sv-photo { border-color: #BFDBFE; box-shadow: 0 0 0 6px var(--s-blue-soft), 0 0 60px -10px rgba(250, 204, 21, .6), 0 24px 50px -20px rgba(29, 78, 216, .5); }
 .sv-initials { font-family: var(--s-mono); font-weight: 700; font-size: clamp(2.4rem, 5vw, 5rem); color: var(--s-blue); }
 
-.sv-card figcaption { display: flex; flex-direction: column; align-items: center; gap: .6vh; text-align: center; }
+.sv-card figcaption { width: 100%; display: flex; flex-direction: column; align-items: center; gap: .6vh; text-align: center; }
 .sv-role { font-family: var(--s-mono); font-size: clamp(.8rem, 1.1vw, 1.1rem); color: var(--s-muted); }
-.sv-card h2 { margin: 0; font-family: var(--s-mono); font-weight: 700; font-size: clamp(1.3rem, 2.5vw, 2.6rem); letter-spacing: -.02em; line-height: 1.15; white-space: nowrap; }
+.sv-card h2 {
+  margin: 0; width: 100%;
+  font-family: var(--s-mono); font-weight: 700; font-size: clamp(1.1rem, 2.1vw, 2.2rem); letter-spacing: -.02em; line-height: 1.15;
+  /* Toujours 2 lignes réservées, coupées au-delà : la hauteur de la carte ne varie jamais */
+  height: 2.3em; overflow: hidden; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
 .sv-card h2 em { font-style: normal; color: var(--s-blue); }
+.sv-role, .sv-meta { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sv-meta { font-family: var(--s-mono); font-size: clamp(.72rem, 1vw, 1rem); color: var(--s-amber); background: var(--s-yellow-soft); padding: .15rem .5rem; border-radius: 5px; }
 .sv-meta.muted { color: var(--s-faint); background: var(--s-soft); }
 
@@ -223,6 +234,21 @@
 .sv-card.searching.locked .sv-photo { border: 1px solid var(--s-yellow); border-style: solid; box-shadow: 0 0 0 4px var(--s-yellow-soft), 0 18px 40px -20px rgba(202, 138, 4, .5); }
 .sv-card.searching.locked .sv-reel-ini { color: var(--s-blue); }
 .sv-card.searching.locked .sv-reel-name { color: var(--s-ink) !important; }
+.sv-reel-name em { font-style: normal; }
+.sv-card.searching.locked .sv-reel-name em { color: var(--s-blue); }
+/* Révélation : la photo apparaît en fondu par-dessus les initiales, la carte ne bouge pas */
+.sv-reveal-img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 17px;
+  opacity: 0; animation: sv-fade-in .9s ease-out .15s forwards;
+}
+@keyframes sv-fade-in { to { opacity: 1; } }
+.sv-card.searching.revealed .sv-photo::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+  box-shadow: inset 0 0 0 3px var(--s-yellow), 0 0 40px rgba(250, 204, 21, .7);
+  opacity: 0; animation: sv-halo 1.6s ease-in-out .2s both;
+}
+.sv-card.instant .sv-reveal-img { animation: none; opacity: 1; }
+.sv-card.instant .sv-photo::after { animation: none; opacity: 0; }
 
 /* ── Lien entre les cartes ── */
 .sv-link { display: flex; flex-direction: column; align-items: center; gap: .8rem; }
@@ -306,6 +332,72 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sv-reveal-img { animation: none; opacity: 1; }
   .sv-caret, .sv-dots::after, .sv-scanline, .sv-scan, .sv-ascii, .sv-ascii::after, .sv-q,
   .sv-glow, .sv-packet, .sv-link.phase-2 .sv-wire-fill { animation: none; }
+}
+
+/* ── Carte retournable : photo devant, QR code WhatsApp derrière ── */
+.sv-flip { position: relative; width: 100%; aspect-ratio: 4 / 5; flex: none; perspective: 1400px; }
+.sv-flip.can-flip { cursor: pointer; }
+.sv-flip-inner {
+  position: absolute; inset: 0;
+  transform-style: preserve-3d;
+  transition: transform .75s cubic-bezier(.2, .7, .2, 1);
+}
+.sv-flip.flipped .sv-flip-inner { transform: rotateY(180deg); }
+.sv-flip.can-flip:hover:not(.flipped) .sv-flip-inner { transform: rotateY(-6deg); }
+.sv-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.sv-face.back { transform: rotateY(180deg); }
+/* Chrome ignore backface-visibility quand la face contient des éléments composités (canvas,
+   animations) : chaque face est donc masquée explicitement au milieu de la rotation. */
+.sv-face.front, .sv-face.back { transition: visibility 0s linear .37s; }
+.sv-face.back { visibility: hidden; }
+.sv-flip.flipped .sv-face.back { visibility: visible; }
+.sv-flip.flipped .sv-face.front { visibility: hidden; }
+.sv-face .sv-photo { height: 100%; }
+.sv-flip-hint {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 5;
+  padding: .15rem .5rem; border-radius: 6px;
+  background: rgba(255, 255, 255, .92); border: 1px solid var(--s-line);
+  font-family: var(--s-mono); font-size: clamp(.55rem, .75vw, .8rem); color: var(--s-blue); font-weight: 700;
+  opacity: 0; animation: sv-fade-in .5s ease-out 1.4s forwards;
+}
+
+/* Dos de la carte */
+.sv-qrback {
+  height: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .7rem;
+  padding: 8% 8%;
+  border-radius: 18px;
+  border: 1px solid #BFDBFE;
+  background:
+    linear-gradient(to right, rgba(29, 78, 216, .05) 1px, transparent 1px) 0 0 / 18px 18px,
+    linear-gradient(to bottom, rgba(29, 78, 216, .05) 1px, transparent 1px) 0 0 / 18px 18px,
+    #fff;
+  box-shadow: 0 0 0 6px var(--s-blue-soft), 0 24px 50px -20px rgba(29, 78, 216, .5);
+  font-family: var(--s-mono); font-size: clamp(.62rem, .95vw, 1rem); text-align: center;
+}
+.sv-qrback-head { color: var(--s-ink); font-weight: 500; }
+.sv-qrback .sv-str { color: var(--s-amber); font-weight: 700; overflow-wrap: anywhere; }
+.sv-qrback .sv-c-cmt { color: var(--s-faint); font-style: italic; }
+.sv-qr {
+  position: relative;
+  width: 72%; aspect-ratio: 1;
+  padding: 7%; background: #fff; border-radius: 12px;
+  box-shadow: 0 10px 26px -14px rgba(29, 78, 216, .6);
+  display: grid; place-items: center;
+}
+.sv-qr svg { width: 100%; height: 100%; display: block; }
+.sv-qr .c { position: absolute; width: 18%; height: 18%; border: 3px solid var(--s-yellow); }
+.sv-qr .tl { top: -5px; left: -5px; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+.sv-qr .tr { top: -5px; right: -5px; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
+.sv-qr .bl { bottom: -5px; left: -5px; border-right: 0; border-top: 0; border-bottom-left-radius: 8px; }
+.sv-qr .br { bottom: -5px; right: -5px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
+.sv-qr.empty { border: 1px dashed #CBD5E1; box-shadow: none; color: #CBD5E1; font-weight: 700; font-size: 1.4em; }
+.sv-c-cmt { color: var(--s-faint); font-style: italic; }
+.sv-str { color: var(--s-amber); }
+@media (prefers-reduced-motion: reduce) {
+  .sv-flip-inner { transition: none; }
+  .sv-flip-hint { animation: none; opacity: 1; }
 }

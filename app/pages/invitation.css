@@ -45,7 +45,9 @@
   pointer-events: none;
 }
 
-.inv-brand, .inv-card, .inv-foot { position: relative; }
+/* flex: none : la carte ne doit jamais être rétrécie à la hauteur de l'écran
+   (sinon, avec un grand zoom, la fin du formulaire est coupée et rien ne défile) */
+.inv-brand, .inv-card, .inv-foot { position: relative; flex: none; }
 
 .inv-brand {
   display: flex;
@@ -160,7 +162,7 @@
 .inv-photo-zone { display: flex; flex-direction: column; align-items: center; gap: .75rem; }
 .inv-photo {
   position: relative;
-  width: 168px; height: 200px;
+  width: 168px; height: 200px; flex: none;
   display: grid; place-items: center;
   border-radius: 12px;
   background: var(--i-soft);
@@ -170,7 +172,8 @@
 }
 .inv-photo:hover { border-color: var(--i-blue-2); background: var(--i-blue-soft); }
 .inv-photo.has-photo { border-style: solid; border-color: var(--i-line); background: #fff; }
-.inv-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 11px; }
+/* L'image remplit le cadre sans jamais l'agrandir, quelle que soit sa taille d'origine */
+.inv-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 11px; }
 .inv-photo-empty {
   display: flex; flex-direction: column; align-items: center; gap: .4rem;
   color: var(--i-blue); font-family: var(--i-mono); font-size: .72rem;

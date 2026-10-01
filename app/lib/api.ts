@@ -94,6 +94,8 @@ export const api = {
   },
   invitations: {
     send: (studentId: string) => request<InvitationResult>(`/students/${studentId}/invitations`, { method: 'POST' }),
+    /** Envoi groupé ; sans liste : tous les profils incomplets. */
+    bulk: (studentIds?: string[]) => request<InvitationResult['email']>('/invitations/bulk', { method: 'POST', body: studentIds ? { studentIds } : {} }),
     resend: (studentId: string) => request<InvitationResult>(`/students/${studentId}/invitations/resend`, { method: 'POST' }),
     verify: (token: string) => request<InvitationPreview>(`/invitations/verify?token=${encodeURIComponent(token)}`),
     complete: (payload: { token: string; profilePictureUrl: string; whatsapp: string }) => request<InvitationPreview>('/invitations/complete', { method: 'POST', body: payload }),

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../lib/api';
 import { demoPairings } from '../lib/demo';
 import { openRoom, type Cmd } from '../lib/channel';
@@ -37,6 +38,14 @@ const hash = (id: string) => {
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return h.toString(16).padStart(7, '0').slice(0, 7);
 };
+/**
+ * Lien WhatsApp « wa.me » avec un message pré-rempli. Le numéro est stocké au format
+ * +2376XXXXXXXX ; wa.me attend uniquement les chiffres, indicatif compris.
+ */
+function waLink(phone: string | null, text: string): string | null {
+  const digits = phone?.replace(/\D/g, '') ?? '';
+  return digits.length >= 8 ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null;
+}
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /* ── Confettis en forme de code ── */
@@ -100,7 +109,9 @@ export default function ShowCode() {
   }, [params]);
 
   const start = () => {
-    sound.unlock(); document.documentElement.requestFullscreen?.().catch(() => {});
+    // Le clic sur « run show() » débloque l'audio : le son est actif par défaut (M pour couper)
+    sound.unlock(); sound.set(true); setSoundOn(true);
+    document.documentElement.requestFullscreen?.().catch(() => {});
     setStage('show');
   };
   const next = useCallback(() => {
@@ -146,7 +157,7 @@ export default function ShowCode() {
   useEffect(() => {
     if (stage !== 'show' || index === 0 || phase !== 2) return;
     if (quiet.current) { quiet.current = false; return; }
-    sound.chime();
+    sound.reveal();
     setFlash(Date.now());
     celebrate();
   }, [phase, index, stage]);
@@ -156,8 +167,9 @@ export default function ShowCode() {
     return () => clearTimeout(t);
   }, [flash]);
   useEffect(() => {
-    if (stage !== 'finale' || reducedMotion()) return;
-    sound.chime();
+    if (stage !== 'finale') return;
+    sound.finale();
+    if (reducedMotion()) return;
     const end = Date.now() + 3200;
     let n = 0;
     (function f() {
@@ -168,10 +180,10 @@ export default function ShowCode() {
     })();
   }, [stage]);
 
-  // Candidats affichés pendant la recherche : uniquement les filleuls pas encore révélés
+  // Candidats affichés pendant la recherche : les parrains qui ont encore des binômes à révéler
   const remaining = useMemo(() => {
     const seen = new Map<string, StudentRef>();
-    order.slice(Math.max(0, index - 1)).forEach((p) => seen.set(p.mentee.id, p.mentee));
+    order.slice(Math.max(0, index - 1)).forEach((p) => seen.set(p.sponsor.id, p.sponsor));
     return [...seen.values()];
   }, [order, index]);
 
@@ -221,7 +233,7 @@ export default function ShowCode() {
           {done.length === 0 && <span className="sv-muted">// aucun binôme pour l'instant</span>}
           {done.map((p) => (
             <motion.span className="sv-commit" key={p.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-              <b>{hash(p.id)}</b> {p.sponsor.firstName} <i>⇄</i> {p.mentee.firstName}
+              <b>{hash(p.id)}</b> {p.mentee.firstName} <i>⇄</i> {p.sponsor.firstName}
             </motion.span>
           ))}
         </div>
@@ -405,16 +417,10 @@ const ASCII_SJI = [
 type BootLine = { k: 'cmd' | 'out' | 'bar' | 'ok' | 'cmt'; t: string; v?: string };
 
 function Intro({ order, room, onStart }: { order: Pairing[]; room: string; onStart: () => void }) {
-  const sponsors = new Set(order.map((p) => p.sponsor.id)).size;
-  const mentees = new Set(order.map((p) => p.mentee.id)).size;
   const lines: BootLine[] = [
     { k: 'cmd', t: '$ ssh root@parrainage.sji' },
     { k: 'out', t: '> connexion établie · TLS 1.3 · clé ed25519' },
     { k: 'cmd', t: '$ npm run parrainage -- --promo=ING3' },
-    { k: 'bar', t: 'chargement des parrains (ING4)', v: `${sponsors}` },
-    { k: 'bar', t: 'chargement des filleuls (ING3)', v: `${mentees}` },
-    { k: 'bar', t: 'initialisation du tirage aléatoire', v: 'OK' },
-    { k: 'ok', t: `${order.length} binômes prêts` },
     { k: 'cmt', t: '// Saint Jean Ingénieur · programme de parrainage' },
   ];
   const [shown, setShown] = useState(0);
@@ -436,7 +442,7 @@ function Intro({ order, room, onStart }: { order: Pairing[]; room: string; onSta
           {lines.slice(0, shown).map((l, i) => (
             <motion.p key={i} className={`sv-boot-${l.k}`} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}>
               <span className="sv-ln">{pad(i + 1)}</span>
-              {l.k === 'bar' ? <ProgressLine label={l.t} value={l.v ?? ''} /> : l.k === 'ok' ? <><span className="sv-check">✓</span> {l.t}</> : l.t}
+              {l.k === 'bar' ? <>&gt; {l.t}… <span className="sv-check">✓ {l.v}</span></> : l.k === 'ok' ? <><span className="sv-check">✓</span> {l.t}</> : l.t}
             </motion.p>
           ))}
           {!ready && <span className="sv-caret" />}
@@ -453,32 +459,12 @@ function Intro({ order, room, onStart }: { order: Pairing[]; room: string; onSta
   );
 }
 
-/** Ligne de progression texte : [██████░░░░] 60 % puis ✓ valeur. */
-function ProgressLine({ label, value }: { label: string; value: string }) {
-  const [n, setN] = useState(0);
-  const SIZE = 20;
-  useEffect(() => {
-    if (n >= SIZE) return;
-    const t = window.setTimeout(() => setN((x) => Math.min(SIZE, x + 1 + Math.floor(Math.random() * 3))), 28);
-    return () => clearTimeout(t);
-  }, [n]);
-  const done = n >= SIZE;
-  return (
-    <>
-      <span className="sv-bar-txt">[<b>{'━'.repeat(n)}</b>{'─'.repeat(SIZE - n)}]</span>{' '}
-      <span className="sv-bar-pct">{pad(Math.round((n / SIZE) * 100), 3)}%</span>{' '}
-      {label}{' '}
-      {done && <span className="sv-check">✓ {value}</span>}
-    </>
-  );
-}
-
 /* ── Binôme en cours ── */
 
 type LogLine = { k: 'cmd' | 'rej' | 'ok' | 'out'; t: string };
 
-/** Déroulé de la recherche : un curseur teste les candidats en ralentissant, puis se verrouille sur le filleul. */
-function useMatchRun(pool: StudentRef[], targetId: string, active: boolean, sponsor: StudentRef) {
+/** Déroulé de la recherche : un curseur teste les parrains en ralentissant, puis se verrouille sur le bon. */
+function useMatchRun(pool: StudentRef[], targetId: string, active: boolean, mentee: StudentRef) {
   const [cursor, setCursor] = useState(-1);
   const [rejected, setRejected] = useState<number[]>([]);
   const [locked, setLocked] = useState(false);
@@ -493,25 +479,24 @@ function useMatchRun(pool: StudentRef[], targetId: string, active: boolean, spon
     const push = (l: LogLine) => setLog((x) => [...x.slice(-5), l]);
     const secs = (ms: number) => `[${(ms / 1000).toFixed(2)}s]`;
 
-    push({ k: 'cmd', t: `> match(parrain: "${short(sponsor)}", candidats: ${pool.length})` });
+    push({ k: 'cmd', t: `> match(filleul: "${short(mentee)}", parrains: ${pool.length})` });
     at(220, () => push({ k: 'out', t: '> seed = crypto.getRandomValues() · tirage en cours' }));
 
-    // Pas de plus en plus lents, comme une roue qui s'arrête
+    // Pas de plus en plus lents, comme une roue qui s'arrête (~220 ms → ~800 ms)
     const BUDGET = 6400;
     let t = 450, k = 0, prevIdx = -1;
     while (others.length) {
-      // Pas plus lents qu'avant : ~220 ms au début, ~800 ms à la fin
       const d = 220 + 580 * Math.pow(k / 14, 2);
       if (t + d > BUDGET || k > 40) break;
       t += d; k++;
       let i = others[Math.floor(Math.random() * others.length)];
       if (others.length > 1) while (i === prevIdx) i = others[Math.floor(Math.random() * others.length)];
       prevIdx = i;
-      const when = t, step = k, idx = i;
+      const when = t, idx = i;
       at(when, () => {
         setCursor(idx);
         setRejected((r) => (r.includes(idx) ? r : [...r, idx]));
-        sound.tick(700 + Math.min(1, when / BUDGET) * 900);
+        sound.step(Math.min(1, when / BUDGET));
         const score = (0.18 + Math.random() * 0.6).toFixed(2);
         push({ k: 'rej', t: `${secs(when)} eval #${pad(idx + 1)} ${short(pool[idx]).padEnd(14)} → ${score} ✗` });
       });
@@ -520,67 +505,93 @@ function useMatchRun(pool: StudentRef[], targetId: string, active: boolean, spon
     at(lockAt, () => {
       setCursor(targetIdx);
       setLocked(true);
-      sound.tick(2200);
+      sound.lock();
       push({ k: 'ok', t: `${secs(lockAt)} eval #${pad(targetIdx + 1)} ${short(pool[targetIdx]).padEnd(14)} → 0.99 ✓ MATCH` });
     });
     return () => timers.forEach(clearTimeout);
-  }, [active, pool, targetId, sponsor]);
+  }, [active, pool, targetId, mentee]);
 
   return { cursor, rejected, locked, log, iter: rejected.length + (locked ? 1 : 0) };
 }
 
-/** Les candidats montrés pendant la recherche (le vrai filleul est toujours dedans). */
+/** Les parrains montrés pendant la recherche (le bon parrain est toujours dedans). */
 function pickPool(all: StudentRef[], target: StudentRef): StudentRef[] {
   const others = shuffle(all.filter((m) => m.id !== target.id)).slice(0, POOL_MAX - 1);
   const at = Math.floor(Math.random() * (others.length + 1));
   return [...others.slice(0, at), target, ...others.slice(at)];
 }
 
-function Duo({ pairing, index, phase, pool: allMentees, nth, total, instant }: {
+/**
+ * Un binôme : le filleul est fixé à gauche, puis les parrains défilent à droite
+ * jusqu'au match. La carte de droite n'est jamais remplacée : elle se fige au
+ * match, puis la photo du parrain apparaît en fondu.
+ */
+function Duo({ pairing, index, phase, pool: allSponsors, nth, total, instant }: {
   pairing: Pairing; index: number; phase: number; pool: StudentRef[]; nth: number; total: number; instant: boolean;
 }) {
   const { sponsor, mentee } = pairing;
-  const pool = useMemo(() => pickPool(allMentees, mentee), [allMentees, mentee]);
-  const run = useMatchRun(pool, mentee.id, phase === 1, sponsor);
+  const pool = useMemo(() => pickPool(allSponsors, sponsor), [allSponsors, sponsor]);
+  const run = useMatchRun(pool, sponsor.id, phase === 1, mentee);
   const [quiet] = useState(instant);
+
+  // Son de chargement, calé sur la dépixellisation de la photo du filleul
+  useEffect(() => {
+    if (phase === 0 && !quiet) sound.load();
+  }, [phase, quiet]);
 
   const consoleLines: LogLine[] =
     phase === 0
       ? [
-          { k: 'cmd', t: `$ SELECT * FROM parrains WHERE id = '${hash(sponsor.id)}';` },
-          { k: 'out', t: `> 1 row · ${sponsor.firstName} ${sponsor.lastName} · ING4${total > 1 ? ` · filleul ${nth}/${total}` : ''}` },
+          { k: 'cmd', t: `$ SELECT * FROM filleuls WHERE id = '${hash(mentee.id)}';` },
+          { k: 'out', t: `> 1 row · ${mentee.firstName} ${mentee.lastName} · ING3` },
         ]
       : phase === 1
         ? run.log
         : [
-            { k: 'ok', t: `✓ match(${short(sponsor)}, ${short(mentee)}) → true` },
+            { k: 'ok', t: `✓ match(${short(mentee)}, ${short(sponsor)}) → true` },
             { k: 'out', t: `> commit ${hash(pairing.id)} · binome_${pad(index)} enregistré` },
           ];
+
+  // QR codes affichés après la révélation : chacun scanne celui de l'autre pour lui écrire
+  const menteeWa = waLink(
+    mentee.whatsapp,
+    `Salut ${mentee.firstName} ! Je suis ${sponsor.firstName} ${sponsor.lastName}, ton parrain du programme de parrainage SJI 👋`,
+  );
+  const sponsorWa = waLink(
+    sponsor.whatsapp,
+    `Bonjour ${sponsor.firstName} ! Je suis ${mentee.firstName} ${mentee.lastName}, ton filleul du programme de parrainage SJI 👋`,
+  );
+
+  // Au match (ou si l'on saute la recherche), la carte affiche directement le bon parrain
+  const candidate = phase === 2 ? sponsor : run.cursor >= 0 ? pool[run.cursor] : null;
+  const locked = phase === 2 || run.locked;
 
   return (
     <div className="sv-stage">
       <div className="sv-duo">
         <motion.div className="sv-left" initial={quiet ? false : { opacity: 0, x: -60 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, ease: [0.2, 0.7, 0.2, 1] }}>
-          <Card s={sponsor} role="parrain" note={total > 1 ? `filleul ${nth}/${total}` : undefined} instant={quiet} />
+          <Card s={mentee} role="filleul" instant={quiet} back={phase === 2 ? { link: menteeWa, who: mentee, label: 'filleul' } : undefined} />
         </motion.div>
 
         <Link phase={phase} iter={run.iter} />
 
         <div className="sv-slot">
-          <AnimatePresence mode="wait">
-            {phase === 0 && (
+          <AnimatePresence mode="wait" initial={false}>
+            {phase === 0 ? (
               <motion.div key="wait" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <Placeholder />
               </motion.div>
-            )}
-            {phase === 1 && (
-              <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-                <SearchCard candidate={run.cursor >= 0 ? pool[run.cursor] : null} index={run.cursor} locked={run.locked} />
-              </motion.div>
-            )}
-            {phase === 2 && (
-              <motion.div key="found" initial={quiet ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-                <Card s={mentee} role="filleul" accent instant={quiet} delay={150} />
+            ) : (
+              <motion.div key="match" initial={quiet ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+                <MatchCard
+                  candidate={candidate}
+                  index={phase === 2 ? -1 : run.cursor}
+                  locked={locked}
+                  revealed={phase === 2}
+                  instant={quiet}
+                  note={total > 1 ? `filleul ${nth}/${total}` : undefined}
+                  back={phase === 2 ? { link: sponsorWa, who: sponsor, label: 'parrain' } : undefined}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -591,21 +602,26 @@ function Duo({ pairing, index, phase, pool: allMentees, nth, total, instant }: {
         {consoleLines.map((l, i) => (
           <p key={`${phase}-${i}-${l.t}`} className={`sv-c-${l.k}`}>{l.t}</p>
         ))}
+        {phase === 2 && <p className="sv-c-out">// clique sur une carte pour afficher son QR code WhatsApp</p>}
       </div>
     </div>
   );
 }
 
-function Card({ s, role, note, accent, instant, delay = 0 }: {
-  s: StudentRef; role: 'parrain' | 'filleul'; note?: string; accent?: boolean; instant?: boolean; delay?: number;
+type BackProps = { link: string | null; who: StudentRef; label: 'filleul' | 'parrain' };
+
+function Card({ s, role, note, accent, instant, delay = 0, back }: {
+  s: StudentRef; role: 'parrain' | 'filleul'; note?: string; accent?: boolean; instant?: boolean; delay?: number; back?: BackProps;
 }) {
   return (
     <figure className={`sv-card${accent ? ' accent' : ''}`}>
-      <div className="sv-photo">
-        <i className="c tl" /><i className="c tr" /><i className="c bl" /><i className="c br" />
-        <PixelPhoto s={s} instant={instant} delay={delay} />
-        {!instant && <span className="sv-scanline" />}
-      </div>
+      <Flip back={back}>
+        <div className="sv-photo">
+          <i className="c tl" /><i className="c tr" /><i className="c bl" /><i className="c br" />
+          <PixelPhoto s={s} instant={instant} delay={delay} />
+          {!instant && <span className="sv-scanline" />}
+        </div>
+      </Flip>
       <figcaption>
         <code className="sv-role"><span className="sv-kw">const</span> {role} <span className="sv-op">=</span></code>
         <h2>
@@ -623,7 +639,7 @@ function Placeholder() {
     <figure className="sv-card searching">
       <div className="sv-photo"><span className="sv-q">?</span></div>
       <figcaption>
-        <code className="sv-role"><span className="sv-kw">let</span> filleul <span className="sv-op">=</span></code>
+        <code className="sv-role"><span className="sv-kw">let</span> parrain <span className="sv-op">=</span></code>
         <h2><span className="sv-muted">undefined</span></h2>
         <code className="sv-meta muted">en attente</code>
       </figcaption>
@@ -631,10 +647,17 @@ function Placeholder() {
   );
 }
 
-/** Carte du filleul pendant la recherche : même format que la carte finale, seul le contenu défile. */
-function SearchCard({ candidate, index, locked }: { candidate: StudentRef | null; index: number; locked: boolean }) {
+/**
+ * Carte du parrain, de la recherche jusqu'à la révélation, sans jamais être remplacée :
+ * les initiales défilent, se figent au match, puis la photo apparaît en fondu par-dessus.
+ */
+function MatchCard({ candidate, index, locked, revealed, instant, note, back }: {
+  candidate: StudentRef | null; index: number; locked: boolean; revealed: boolean; instant: boolean; note?: string; back?: BackProps;
+}) {
+  const photo = revealed ? candidate?.profilePictureUrl : null;
   return (
-    <figure className={`sv-card searching${locked ? ' locked' : ''}`}>
+    <figure className={`sv-card searching${locked ? ' locked' : ''}${revealed ? ' revealed' : ''}${instant ? ' instant' : ''}`}>
+      <Flip back={back}>
       <div className="sv-photo">
         <i className="c tl" /><i className="c tr" /><i className="c bl" /><i className="c br" />
         <AnimatePresence mode="popLayout" initial={false}>
@@ -649,15 +672,91 @@ function SearchCard({ candidate, index, locked }: { candidate: StudentRef | null
             {candidate ? initials(candidate) : '?'}
           </motion.span>
         </AnimatePresence>
-        <code className="sv-reel-idx">{index >= 0 ? `candidat #${pad(index + 1)}` : 'seed…'}</code>
+        {photo && <img className="sv-reveal-img" src={photo} alt="" />}
+        {!locked && <code className="sv-reel-idx">{index >= 0 ? `candidat #${pad(index + 1)}` : 'seed…'}</code>}
         {!locked && <span className="sv-scan" />}
       </div>
+      </Flip>
       <figcaption>
-        <code className="sv-role"><span className="sv-kw">let</span> filleul <span className="sv-op">=</span></code>
-        <h2 className="sv-reel-name">{candidate ? `${candidate.firstName} ${candidate.lastName}` : <span className="sv-muted">undefined</span>}</h2>
-        <code className="sv-meta">{locked ? '✓ trouvé' : <>match()<span className="sv-dots" /></>}</code>
+        <code className="sv-role"><span className="sv-kw">{revealed ? 'const' : 'let'}</span> parrain <span className="sv-op">=</span></code>
+        <h2 className="sv-reel-name">
+          {candidate ? <>{candidate.firstName} <em>{candidate.lastName}</em></> : <span className="sv-muted">undefined</span>}
+        </h2>
+        <code className="sv-meta">{revealed ? `ING4${note ? ` · ${note}` : ''}` : locked ? '✓ trouvé' : <>match()<span className="sv-dots" /></>}</code>
       </figcaption>
     </figure>
+  );
+}
+
+/** Logo SJI au centre du QR code (le QR est généré avec une correction d'erreur élevée). */
+const SJI_LOGO =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40"><rect width="60" height="40" rx="7" fill="#1D4ED8"/>' +
+      '<rect y="34" width="60" height="6" fill="#FACC15"/><text x="30" y="26" text-anchor="middle" ' +
+      'font-family="JetBrains Mono, Consolas, monospace" font-weight="700" font-size="20" fill="#fff">SJI</text></svg>',
+  );
+
+/**
+ * Zone photo retournable : une fois la carte révélée, un clic la fait pivoter
+ * pour montrer le QR code WhatsApp au dos. Sans `back`, la photo reste fixe.
+ */
+function Flip({ back, children }: { back?: BackProps; children: React.ReactNode }) {
+  const [flipped, setFlipped] = useState(false);
+  const toggle = () => {
+    if (!back) return;
+    sound.flip();
+    setFlipped((f) => !f);
+  };
+  return (
+    <div
+      className={`sv-flip${back ? ' can-flip' : ''}${flipped && back ? ' flipped' : ''}`}
+      onClick={toggle}
+      role={back ? 'button' : undefined}
+      aria-label={back ? (flipped ? 'Revenir à la photo' : `Afficher le QR code WhatsApp de ${back.who.firstName}`) : undefined}
+    >
+      <div className="sv-flip-inner">
+        <div className="sv-face front">
+          {children}
+          {back && <span className="sv-flip-hint">⟲ qr</span>}
+        </div>
+        {back && (
+          <div className="sv-face back">
+            <QrBack {...back} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Dos de carte : grand QR code WhatsApp aux couleurs SJI. */
+function QrBack({ link, who, label }: BackProps) {
+  const shown = link?.replace(/^https:\/\//, '').replace(/\?.*$/, '');
+  return (
+    <div className="sv-qrback">
+      <code className="sv-qrback-head">
+        <span className="sv-kw">const</span> {label}<span className="sv-op">.</span><span className="sv-fn">whatsapp</span>
+      </code>
+      {link ? (
+        <div className="sv-qr">
+          <i className="c tl" /><i className="c tr" /><i className="c bl" /><i className="c br" />
+          <QRCodeSVG
+            value={link}
+            size={512}
+            level="H"
+            marginSize={0}
+            fgColor="#1D4ED8"
+            bgColor="#FFFFFF"
+            imageSettings={{ src: SJI_LOGO, width: 132, height: 88, excavate: true }}
+          />
+        </div>
+      ) : (
+        <div className="sv-qr empty"><span>null</span></div>
+      )}
+      {shown ? <code className="sv-str">"{shown}"</code> : <code className="sv-muted">whatsapp: null</code>}
+      <code className="sv-c-cmt">{link ? `// scanne pour écrire à ${who.firstName}` : '// profil non complété'}</code>
+    </div>
   );
 }
 

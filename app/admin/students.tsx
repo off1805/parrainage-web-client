@@ -48,24 +48,12 @@ export default function StudentsPage() {
   const inviteAll = () =>
     run("invite-all", async () => {
       if (!confirm(`Envoyer une invitation aux ${incomplete.length} étudiants dont le profil est incomplet ?`)) return;
-      let sent = 0;
-      const failed: string[] = [];
-      for (const s of incomplete) {
-        try {
-          const r = await api.invitations.send(s.id);
-          if (r.email.failed.length) failed.push(s.email);
-          else sent++;
-        } catch {
-          failed.push(s.email);
-        }
-      }
-      if (failed.length) {
-        setNotice({ kind: "error", text: `${sent} invitation(s) envoyée(s), ${failed.length} échec(s) : ${failed.join(", ")}` });
+      const r = await api.invitations.bulk(incomplete.map((s) => s.id));
+      if (r.failed.length) {
+        setNotice({ kind: "error", text: `${r.sent}/${r.total} invitation(s) envoyée(s). Échecs : ${r.failed.map((f) => f.email).join(", ")} — ${r.failed[0].reason}` });
         return;
       }
-      return failed.length
-        ? `${sent} invitation(s) envoyée(s), ${failed.length} échec(s) : ${failed.join(", ")}`
-        : `${sent} invitation(s) envoyée(s).`;
+      return `${r.sent} invitation(s) envoyée(s).`;
     });
 
   return (
