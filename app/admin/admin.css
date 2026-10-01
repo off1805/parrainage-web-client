@@ -83,6 +83,9 @@
 .adm-form-row { display: flex; align-items: flex-end; gap: .75rem; flex-wrap: wrap; }
 .adm-field { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; color: var(--a-muted); }
 .adm-field.narrow { max-width: 190px; }
+.adm-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem .75rem; }
+.adm-form-grid .wide { grid-column: 1 / -1; }
+.adm-form-grid .adm-btn { align-self: flex-start; }
 
 .adm-input {
   font: inherit;
@@ -133,6 +136,8 @@
 .adm-table tr:last-child td { border-bottom: 0; }
 .adm-table.compact td { padding: .25rem .5rem; }
 .adm-actions { white-space: nowrap; }
+.adm-mail { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; margin-top: .3rem; }
+.adm-badge.error { background: var(--a-err-bg); color: var(--a-err); }
 .adm-actions .adm-btn + .adm-btn { margin-left: .25rem; }
 
 .adm-avatar { width: 36px; }
@@ -190,3 +195,13 @@
   .adm-row .adm-input { min-width: 0; flex: 1; }
   .adm-table { display: block; overflow-x: auto; }
 }
+
+/* Vérification d'identité avant l'admin */
+.adm-gate { display: grid; place-items: center; padding: 1rem; }
+.adm-gate-box { width: min(360px, 100%); }
+.adm-gate-box .adm-btn { align-self: flex-start; }
+
+/* Sélecteur de section (francophone / anglophone) */
+.adm-section { margin-left: auto; display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--a-line); border-radius: 8px; background: var(--a-bg); }
+.adm-section button { border: 0; background: none; padding: .35rem .8rem; border-radius: 6px; color: var(--a-muted); cursor: pointer; font-weight: 500; }
+.adm-section button.active { background: var(--a-accent); color: #fff; }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { useOutletContext } from "react-router";
 import { describeError } from "../lib/errors";
-import type { Student } from "../lib/types";
+import type { Student, StudentSection } from "../lib/types";
 
 export function fullName(s: { firstName: string; lastName: string }) {
   return `${s.firstName} ${s.lastName}`;
@@ -72,4 +73,12 @@ export function useAction(setNotice: (n: Notice) => void) {
     [setNotice],
   );
   return { busy, run };
+}
+
+/** Libellés des sections. */
+export const SECTION_LABEL: Record<StudentSection, string> = { FR: "Francophone", EN: "Anglophone" };
+
+/** Section choisie en haut de l'admin (fournie par le layout). */
+export function useSection(): StudentSection {
+  return useOutletContext<StudentSection>();
 }

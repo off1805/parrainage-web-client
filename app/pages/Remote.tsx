@@ -16,20 +16,28 @@ export default function Remote() {
   }, [room]);
 
   const send = (type: Cmd['type']) => { navigator.vibrate?.(15); r.current?.sendCmd({ type }); };
-  if (!room) return <div className="center"><p className="lead">Code de salle manquant. Ouvre le lien affiché sur l'écran du show.</p></div>;
+  if (!room) return (
+    <div className="sji-page">
+      <span className="sji-logo">SJI</span>
+      <p className="sji-comment">// code de salle manquant : ouvre le lien affiché sur l'écran du show</p>
+    </div>
+  );
 
   return (
-    <div className="remote">
-      <span className="script">Télécommande</span>
-      <p className="lead">{st ? (st.stage === 'finale' ? 'Grand tableau' : `${st.index} / ${st.total} couples`) : 'Connexion…'}</p>
-      <button className="big-btn" onClick={() => send('next')}>Suivant</button>
-      <div className="row">
-        <button onClick={() => send('prev')}>← Précédent</button>
-        <button onClick={() => send('finale')}>Grand tableau</button>
+    <div className="sji-page">
+      <span className="sji-logo">SJI</span>
+      <h1 className="sji-title"><span className="sji-kw">remote</span><span className="sji-op">.</span><span className="sji-fn">control</span><span className="sji-op">()</span></h1>
+      <p className="sji-status">
+        {st ? (st.stage === 'finale' ? <b>écran final</b> : <><b>{st.index}</b> / {st.total} binômes</>) : 'connexion…'}
+      </p>
+      <button className="sji-btn primary sji-remote-next" onClick={() => send('next')}>next() ▶</button>
+      <div className="sji-row">
+        <button className="sji-btn" onClick={() => send('prev')}>◀ prev()</button>
+        <button className="sji-btn" onClick={() => send('finale')}>merci()</button>
       </div>
-      <div className="row">
-        <button onClick={() => send('sound')}>Son : {st?.sound ? 'oui' : 'non'}</button>
-        <button onClick={() => confirm('Rejouer depuis le début ?') && send('reset')}>Rejouer</button>
+      <div className="sji-row">
+        <button className="sji-btn" onClick={() => send('sound')}>son : {st?.sound ? 'on' : 'off'}</button>
+        <button className="sji-btn" onClick={() => confirm('Rejouer depuis le début ?') && send('reset')}>reset()</button>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { api, ApiError } from "../lib/api";
 import { describeError } from "../lib/errors";
 import type { Pairing, PairingSessionView, PairingValidationReport, SessionStatus } from "../lib/types";
-import { formatDate, fullName, NoticeBar, useAction, useLoad, type Notice } from "./shared";
+import { formatDate, fullName, NoticeBar, SECTION_LABEL, useAction, useLoad, useSection, type Notice } from "./shared";
 
 const STATUS_LABEL: Record<SessionStatus, string> = {
   DRAFT: "Brouillon",
@@ -18,7 +18,8 @@ const ORIGIN_LABEL: Record<Pairing["origin"], string> = {
 };
 
 export default function SessionsPage() {
-  const sessions = useLoad(() => api.sessions.list());
+  const section = useSection();
+  const sessions = useLoad(() => api.sessions.list(section));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<PairingSessionView | null>(null);
   const [report, setReport] = useState<PairingValidationReport | null>(null);
@@ -59,7 +60,7 @@ export default function SessionsPage() {
 
   const create = () =>
     run("create", async () => {
-      const s = await api.sessions.create();
+      const s = await api.sessions.create(section);
       await sessions.reload();
       setSelectedId(s.id);
       return "Session créée.";
@@ -95,7 +96,7 @@ export default function SessionsPage() {
     <div className="adm-split">
       <section className="adm-panel">
         <div className="adm-panel-head">
-          <h2>Sessions</h2>
+          <h2>Sessions · {SECTION_LABEL[section].toLowerCase()}</h2>
           <button className="adm-btn primary" onClick={create} disabled={busy !== null}>
             {busy === "create" ? "…" : "Nouvelle session"}
           </button>
@@ -157,7 +158,7 @@ export default function SessionsPage() {
                 </button>
               )}
               {view.pairings.length > 0 && (
-                <Link className="adm-btn" to="/show" target="_blank">Ouvrir le show ↗</Link>
+                <Link className="adm-btn" to={`/show?session=${view.id}`} target="_blank">Ouvrir le show de cette session ↗</Link>
               )}
             </div>
 

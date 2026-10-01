@@ -4,10 +4,13 @@ export interface StudentRef {
 }
 export interface Pairing { id: string; origin: 'RANDOM' | 'PRECONFIGURED' | 'MANUAL'; sponsor: StudentRef; mentee: StudentRef }
 export type SessionStatus = 'DRAFT' | 'GENERATED' | 'FINALIZED';
-export interface PairingSession { id: string; status: SessionStatus; createdAt: string; generatedAt: string | null; finalizedAt: string | null }
+export interface PairingSession { id: string; status: SessionStatus; section: StudentSection; createdAt: string; generatedAt: string | null; finalizedAt: string | null }
 export interface PairingSessionView extends PairingSession { pairings: Pairing[] }
 
 export type StudentLevel = 'ING3' | 'ING4';
+
+/** FR : section francophone · EN : section anglophone (deux parrainages indépendants). */
+export type StudentSection = 'FR' | 'EN';
 
 export interface Student {
   id: string;
@@ -16,6 +19,7 @@ export interface Student {
   email: string;
   matricule: string | null;
   level: StudentLevel;
+  section: StudentSection;
   whatsapp: string | null;
   profilePictureUrl: string | null;
   maxMentees: number | null;
@@ -48,6 +52,16 @@ export interface InvitationResult {
     sent: number;
     failed: { email: string; reason: string }[];
   };
+}
+
+export interface InvitationOverview {
+  /** false si Brevo n'est pas configuré : on ne connaît alors que l'envoi, pas la livraison */
+  deliveryTracking: boolean;
+  students: {
+    studentId: string;
+    invitation: { status: string; sentAt: string; expiresAt: string | null; usedAt: string | null } | null;
+    delivery: { event: string; date: string; reason?: string } | null;
+  }[];
 }
 
 export interface InvitationPreview {

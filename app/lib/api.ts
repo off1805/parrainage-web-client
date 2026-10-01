@@ -1,6 +1,7 @@
 import type {
   ConstraintType,
   ImportResult,
+  InvitationOverview,
   InvitationPreview,
   InvitationResult,
   PairingConstraint,
@@ -9,6 +10,7 @@ import type {
   PairingValidationReport,
   Student,
   StudentLevel,
+  StudentSection,
 } from './types';
 
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
@@ -75,25 +77,30 @@ async function request<T>(path: string, options: FetchOptions = {}): Promise<T> 
 
 export const api = {
   students: {
-    list: (params?: { level?: StudentLevel; search?: string }) => {
+    list: (params?: { level?: StudentLevel; section?: StudentSection; search?: string }) => {
       const q = new URLSearchParams();
       if (params?.level) q.set('level', params.level);
+      if (params?.section) q.set('section', params.section);
       if (params?.search) q.set('search', params.search);
       const qs = q.toString();
       return request<Student[]>(`/students${qs ? '?' + qs : ''}`);
     },
     get: (id: string) => request<Student>(`/students/${id}`),
+    create: (payload: { firstName: string; lastName: string; email: string; matricule?: string; level: StudentLevel; section: StudentSection; maxMentees?: number }) =>
+      request<Student>('/students', { method: 'POST', body: payload }),
     update: (id: string, patch: Partial<Omit<Student, 'id' | 'email' | 'level' | 'createdAt' | 'updatedAt'>>) => request<Student>(`/students/${id}`, { method: 'PATCH', body: patch }),
-    import: (file: File, options: { level?: StudentLevel; maxMentees?: number } = {}) => {
+    import: (file: File, options: { level?: StudentLevel; section?: StudentSection; maxMentees?: number } = {}) => {
       const fd = new FormData();
       fd.append('file', file);
       if (options.level) fd.append('level', options.level);
+      if (options.section) fd.append('section', options.section);
       if (options.maxMentees) fd.append('maxMentees', String(options.maxMentees));
       return request<ImportResult>('/students/import', { method: 'POST', body: fd, isFormData: true });
     },
   },
   invitations: {
     send: (studentId: string) => request<InvitationResult>(`/students/${studentId}/invitations`, { method: 'POST' }),
+    overview: () => request<InvitationOverview>('/invitations/overview'),
     /** Envoi groupé ; sans liste : tous les profils incomplets. */
     bulk: (studentIds?: string[]) => request<InvitationResult['email']>('/invitations/bulk', { method: 'POST', body: studentIds ? { studentIds } : {} }),
     resend: (studentId: string) => request<InvitationResult>(`/students/${studentId}/invitations/resend`, { method: 'POST' }),
@@ -101,9 +108,12 @@ export const api = {
     complete: (payload: { token: string; profilePictureUrl: string; whatsapp: string }) => request<InvitationPreview>('/invitations/complete', { method: 'POST', body: payload }),
   },
   constraints: {
-    list: (type?: ConstraintType) => {
-      const q = type ? `?type=${type}` : '';
-      return request<PairingConstraint[]>(`/pairing-constraints${q}`);
+    list: (params: { type?: ConstraintType; section?: StudentSection } = {}) => {
+      const q = new URLSearchParams();
+      if (params.type) q.set('type', params.type);
+      if (params.section) q.set('section', params.section);
+      const qs = q.toString();
+      return request<PairingConstraint[]>(`/pairing-constraints${qs ? '?' + qs : ''}`);
     },
     create: (payload: { sponsorId: string; menteeId: string; type: ConstraintType; reason?: string }) => request<PairingConstraint>('/pairing-constraints', { method: 'POST', body: payload }),
     remove: async (id: string) => {
@@ -118,8 +128,8 @@ export const api = {
     },
   },
   sessions: {
-    list: () => request<PairingSession[]>('/pairing-sessions'),
-    create: () => request<PairingSession>('/pairing-sessions', { method: 'POST' }),
+    list: (section?: StudentSection) => request<PairingSession[]>(`/pairing-sessions${section ? `?section=${section}` : ''}`),
+    create: (section: StudentSection) => request<PairingSession>('/pairing-sessions', { method: 'POST', body: { section } }),
     get: (id: string) => request<PairingSessionView>(`/pairing-sessions/${id}`),
     validate: (id: string) => request<PairingValidationReport>(`/pairing-sessions/${id}/validate`, { method: 'POST' }),
     generate: (id: string) => request<PairingSessionView>(`/pairing-sessions/${id}/generate`, { method: 'POST' }),

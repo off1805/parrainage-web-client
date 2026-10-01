@@ -1,1 +1,1 @@
-export { default } from "../pages/Show";
+export { default } from "../pages/ShowCode";

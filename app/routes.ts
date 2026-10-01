@@ -3,7 +3,6 @@ import { type RouteConfig, index, layout, prefix, route } from "@react-router/de
 export default [
   index("routes/home.tsx"),
   route("show", "routes/show.tsx"),
-  route("show-v2", "routes/show-v2.tsx"),
   route("remote", "routes/remote.tsx"),
   route("invitation", "routes/invitation.tsx"),
   ...prefix("admin", [

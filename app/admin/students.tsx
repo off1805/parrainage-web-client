@@ -1,8 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { describeError } from "../lib/errors";
-import type { ImportResult, InvitationResult, Student, StudentLevel } from "../lib/types";
-import { fullName, NoticeBar, profileComplete, useAction, useLoad, type Notice } from "./shared";
+import type { ImportResult, InvitationOverview, InvitationResult, Student, StudentLevel } from "../lib/types";
+import { formatDate, fullName, NoticeBar, profileComplete, SECTION_LABEL, useAction, useLoad, useSection, type Notice } from "./shared";
 
 type LevelChoice = "" | StudentLevel;
 
@@ -12,7 +12,13 @@ function emailSummary(r: InvitationResult) {
 }
 
 export default function StudentsPage() {
-  const students = useLoad(() => api.students.list());
+  const section = useSection();
+  const students = useLoad(() => api.students.list({ section }));
+  const overview = useLoad(() => api.invitations.overview());
+  const tracking = useMemo(
+    () => new Map((overview.data?.students ?? []).map((o) => [o.studentId, o])),
+    [overview.data],
+  );
   const [notice, setNotice] = useState<Notice>(null);
   const { busy, run } = useAction(setNotice);
   const [search, setSearch] = useState("");
@@ -38,6 +44,7 @@ export default function StudentsPage() {
   const invite = (s: Student, resend: boolean) =>
     run(`${resend ? "resend" : "send"}-${s.id}`, async () => {
       const r = resend ? await api.invitations.resend(s.id) : await api.invitations.send(s.id);
+      void overview.reload();
       if (r.email.failed.length) {
         setNotice({ kind: "error", text: `${fullName(s)} : ${emailSummary(r)}` });
         return;
@@ -49,6 +56,7 @@ export default function StudentsPage() {
     run("invite-all", async () => {
       if (!confirm(`Envoyer une invitation aux ${incomplete.length} étudiants dont le profil est incomplet ?`)) return;
       const r = await api.invitations.bulk(incomplete.map((s) => s.id));
+      void overview.reload();
       if (r.failed.length) {
         setNotice({ kind: "error", text: `${r.sent}/${r.total} invitation(s) envoyée(s). Échecs : ${r.failed.map((f) => f.email).join(", ")} — ${r.failed[0].reason}` });
         return;
@@ -58,11 +66,14 @@ export default function StudentsPage() {
 
   return (
     <>
-      <ImportPanel onImported={students.reload} />
+      <div className="adm-columns">
+        <AddStudentPanel onAdded={students.reload} />
+        <ImportPanel onImported={students.reload} />
+      </div>
 
       <section className="adm-panel">
         <div className="adm-panel-head">
-          <h2>Étudiants</h2>
+          <h2>Étudiants · section {SECTION_LABEL[section].toLowerCase()}</h2>
           <div className="adm-row">
             <input
               className="adm-input"
@@ -70,7 +81,7 @@ export default function StudentsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <button className="adm-btn" onClick={students.reload} disabled={students.loading}>
+            <button className="adm-btn" onClick={() => { students.reload(); overview.reload(); }} disabled={students.loading}>
               Actualiser
             </button>
             <button className="adm-btn primary" onClick={inviteAll} disabled={!incomplete.length || busy !== null}>
@@ -91,6 +102,7 @@ export default function StudentsPage() {
               rows={byLevel("ING4")}
               busy={busy}
               onInvite={invite}
+              tracking={tracking}
               onUpdated={replace}
               setNotice={setNotice}
             />
@@ -100,6 +112,7 @@ export default function StudentsPage() {
               rows={byLevel("ING3")}
               busy={busy}
               onInvite={invite}
+              tracking={tracking}
               onUpdated={replace}
               setNotice={setNotice}
             />
@@ -110,9 +123,109 @@ export default function StudentsPage() {
   );
 }
 
+/* ── Suivi des mails ── */
+
+const DELIVERY: Record<string, { label: string; kind: "ok" | "pending" | "error" }> = {
+  requests: { label: "Envoi en cours", kind: "pending" },
+  deferred: { label: "Différé", kind: "pending" },
+  softBounces: { label: "Rebond temporaire", kind: "pending" },
+  delivered: { label: "Délivré ✓", kind: "ok" },
+  opened: { label: "Ouvert ✓", kind: "ok" },
+  clicks: { label: "Lien cliqué ✓", kind: "ok" },
+  hardBounces: { label: "Adresse invalide", kind: "error" },
+  invalid: { label: "Adresse invalide", kind: "error" },
+  blocked: { label: "Bloqué", kind: "error" },
+  error: { label: "Rejeté", kind: "error" },
+  spam: { label: "Signalé spam", kind: "error" },
+  unsubscribed: { label: "Désinscrit", kind: "error" },
+};
+
+const INVITATION: Record<string, string> = {
+  PENDING: "Lien envoyé",
+  USED: "Profil complété",
+  EXPIRED: "Lien expiré",
+  CANCELLED: "Lien remplacé",
+};
+
+/** Sous les boutons : dernière invitation et état de livraison du mail (via Brevo). */
+function MailStatus({ info }: { info?: InvitationOverview["students"][number] }) {
+  if (!info?.invitation) return <div className="adm-mail"><span className="adm-badge">Jamais invité</span></div>;
+  const inv = info.invitation;
+  const d = info.delivery ? DELIVERY[info.delivery.event] ?? { label: info.delivery.event, kind: "pending" as const } : null;
+  return (
+    <div className="adm-mail" title={info.delivery?.reason ?? undefined}>
+      <span className="adm-muted small">{INVITATION[inv.status.toUpperCase()] ?? inv.status} · {formatDate(inv.sentAt)}</span>
+      {d && <span className={`adm-badge ${d.kind}`}>{d.label}</span>}
+    </div>
+  );
+}
+
+/* ── Ajout d'un seul étudiant ── */
+
+function AddStudentPanel({ onAdded }: { onAdded: () => void }) {
+  const section = useSection();
+  const empty = { firstName: "", lastName: "", email: "", matricule: "", level: "ING3" as StudentLevel, maxMentees: "2" };
+  const [form, setForm] = useState(empty);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [sending, setSending] = useState(false);
+  const set = (k: keyof typeof empty) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSending(true);
+    setNotice(null);
+    try {
+      const s = await api.students.create({
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        matricule: form.matricule || undefined,
+        level: form.level,
+        section,
+        maxMentees: form.level === "ING4" ? Number(form.maxMentees) : undefined,
+      });
+      setNotice({ kind: "ok", text: `${fullName(s)} ajouté(e) en ${s.level}.` });
+      setForm({ ...empty, level: form.level, maxMentees: form.maxMentees });
+      onAdded();
+    } catch (err) {
+      setNotice({ kind: "error", text: describeError(err) });
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <section className="adm-panel">
+      <h2>Ajouter un étudiant <span className="adm-muted small">· {SECTION_LABEL[section].toLowerCase()}</span></h2>
+      <form className="adm-form-grid" onSubmit={submit}>
+        <label className="adm-field"><span>Prénom</span><input className="adm-input" required maxLength={100} value={form.firstName} onChange={set("firstName")} /></label>
+        <label className="adm-field"><span>Nom</span><input className="adm-input" required maxLength={100} value={form.lastName} onChange={set("lastName")} /></label>
+        <label className="adm-field wide"><span>Email</span><input className="adm-input" type="email" required maxLength={255} value={form.email} onChange={set("email")} /></label>
+        <label className="adm-field"><span>Matricule (facultatif)</span><input className="adm-input" maxLength={50} value={form.matricule} onChange={set("matricule")} /></label>
+        <label className="adm-field">
+          <span>Niveau</span>
+          <select className="adm-input" value={form.level} onChange={set("level")}>
+            <option value="ING3">ING3 · filleul</option>
+            <option value="ING4">ING4 · parrain</option>
+          </select>
+        </label>
+        {form.level === "ING4" && (
+          <label className="adm-field"><span>Filleuls max</span><input className="adm-input" type="number" min={1} max={50} required value={form.maxMentees} onChange={set("maxMentees")} /></label>
+        )}
+        <div className="adm-field wide">
+          <button className="adm-btn primary" disabled={sending}>{sending ? "Ajout…" : "Ajouter"}</button>
+        </div>
+      </form>
+      <NoticeBar notice={notice} onClose={() => setNotice(null)} />
+    </section>
+  );
+}
+
 /* ── Import ── */
 
 function ImportPanel({ onImported }: { onImported: () => void }) {
+  const section = useSection();
   const [file, setFile] = useState<File | null>(null);
   const [level, setLevel] = useState<LevelChoice>("");
   const [maxMentees, setMaxMentees] = useState("");
@@ -130,6 +243,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
     try {
       const r = await api.students.import(file, {
         level: level || undefined,
+        section,
         maxMentees: maxMentees ? Number(maxMentees) : undefined,
       });
       setResult(r);
@@ -145,7 +259,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
 
   return (
     <section className="adm-panel">
-      <h2>Importer une liste</h2>
+      <h2>Importer une liste <span className="adm-muted small">· {SECTION_LABEL[section].toLowerCase()}</span></h2>
       <form className="adm-form-row" onSubmit={submit}>
         <label className="adm-field">
           <span>Fichier CSV ou XLSX</span>
@@ -219,6 +333,7 @@ function StudentTable({
   rows,
   busy,
   onInvite,
+  tracking,
   onUpdated,
   setNotice,
 }: {
@@ -227,6 +342,7 @@ function StudentTable({
   rows: Student[];
   busy: string | null;
   onInvite: (s: Student, resend: boolean) => void;
+  tracking: Map<string, InvitationOverview["students"][number]>;
   onUpdated: (s: Student) => void;
   setNotice: (n: Notice) => void;
 }) {
@@ -302,6 +418,7 @@ function StudentTable({
                     >
                       {busy === `resend-${s.id}` ? "…" : "Renvoyer"}
                     </button>
+                    <MailStatus info={tracking.get(s.id)} />
                   </td>
                 </tr>
               );

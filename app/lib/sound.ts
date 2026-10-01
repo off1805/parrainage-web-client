@@ -113,10 +113,4 @@ export const sound = {
     noise(1.2, { from: 800, to: 8000, gain: 0.04, at: 0.5 });
   },
 
-  /** Ancien carillon (utilisé par la première version du show). */
-  chime() {
-    [880, 1318.5, 1760].forEach((f, i) => tone(f, 1.8, { gain: 0.12 / (i + 1) }));
-  },
-  /** Ancien bip (compatibilité). */
-  tick(freq = 1400) { tone(freq, 0.05, { type: 'square', gain: 0.025 }); },
 };

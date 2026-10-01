@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { api } from "../lib/api";
 import type { ConstraintType, PairingConstraint, Student } from "../lib/types";
-import { formatDate, fullName, NoticeBar, useAction, useLoad, type Notice } from "./shared";
+import { formatDate, fullName, NoticeBar, SECTION_LABEL, useAction, useLoad, useSection, type Notice } from "./shared";
 
 const TYPES: { type: ConstraintType; title: string; help: string }[] = [
   { type: "REQUIRED", title: "Couples imposés", help: "Ces binômes seront toujours formés." },
@@ -9,8 +9,9 @@ const TYPES: { type: ConstraintType; title: string; help: string }[] = [
 ];
 
 export default function ConstraintsPage() {
+  const section = useSection();
   const data = useLoad(async () => {
-    const [constraints, students] = await Promise.all([api.constraints.list(), api.students.list()]);
+    const [constraints, students] = await Promise.all([api.constraints.list({ section }), api.students.list({ section })]);
     return { constraints, students };
   });
   const [notice, setNotice] = useState<Notice>(null);
@@ -52,7 +53,7 @@ export default function ConstraintsPage() {
   return (
     <>
       <section className="adm-panel">
-        <h2>Ajouter une contrainte</h2>
+        <h2>Ajouter une contrainte <span className="adm-muted small">· section {SECTION_LABEL[section].toLowerCase()}</span></h2>
         <form className="adm-form-row" onSubmit={add}>
           <label className="adm-field">
             <span>Type</span>

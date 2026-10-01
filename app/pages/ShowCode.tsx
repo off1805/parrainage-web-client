@@ -82,6 +82,8 @@ export default function ShowCode() {
   const [phase, setPhase] = useState(2); // 0 parrain · 1 recherche · 2 révélé
   const [soundOn, setSoundOn] = useState(false);
   const [flash, setFlash] = useState<number | null>(null);
+  // Session affichée dans l'intro : ?session=<id>, sinon la plus récente qui a un tirage
+  const [sessionLabel, setSessionLabel] = useState('');
   const quiet = useRef(false);
   const live = useRef({ index, phase, stage, total: 0, soundOn });
   live.current = { index, phase, stage, total: order.length, soundOn };
@@ -91,15 +93,20 @@ export default function ShowCode() {
     (async () => {
       try {
         let list: Pairing[];
-        if (params.get('demo')) list = demoPairings(Number(params.get('demo')));
+        if (params.get('demo')) { list = demoPairings(Number(params.get('demo'))); setSessionLabel('démo'); }
         else {
           let id = params.get('session');
           if (!id) {
-            const s = (await api.sessions.list()).find((x) => x.status !== 'DRAFT');
-            if (!s) throw new Error("Aucune session générée. Lance le tirage depuis l'admin.");
+            // ?section=FR|EN : dernière session de cette section ; sinon la plus récente toutes sections
+            const wanted = params.get('section')?.toUpperCase();
+            const section = wanted === 'EN' || wanted === 'FR' ? wanted : undefined;
+            const s = (await api.sessions.list(section)).find((x) => x.status !== 'DRAFT');
+            if (!s) throw new Error(`Aucune session générée${section ? ` pour la section ${section === 'EN' ? 'anglophone' : 'francophone'}` : ''}. Lance le tirage depuis l'admin.`);
             id = s.id;
           }
-          list = (await api.sessions.get(id)).pairings;
+          const view = await api.sessions.get(id);
+          list = view.pairings;
+          setSessionLabel(`section ${view.section === 'EN' ? 'anglophone' : 'francophone'} · ${new Date(view.createdAt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} · ${view.status === 'FINALIZED' ? 'finalisée' : 'tirage fait'} · ${view.id.slice(0, 8)}`);
         }
         if (!list.length) throw new Error('Cette session ne contient aucun binôme.');
         list.forEach((p) => [p.sponsor, p.mentee].forEach((s) => { if (s.profilePictureUrl) new Image().src = s.profilePictureUrl; }));
@@ -199,7 +206,7 @@ export default function ShowCode() {
       <div className="sv-center"><p className="sv-term sv-err">✗ {error}</p></div>
     </Frame>
   );
-  if (stage === 'intro') return <Intro order={order} room={room} onStart={start} />;
+  if (stage === 'intro') return <Intro session={sessionLabel} room={room} onStart={start} />;
   if (stage === 'finale') return <Finale pairings={order} />;
 
   const cur = index > 0 ? order[index - 1] : null;
@@ -416,11 +423,12 @@ const ASCII_SJI = [
 
 type BootLine = { k: 'cmd' | 'out' | 'bar' | 'ok' | 'cmt'; t: string; v?: string };
 
-function Intro({ order, room, onStart }: { order: Pairing[]; room: string; onStart: () => void }) {
+function Intro({ session, room, onStart }: { session: string; room: string; onStart: () => void }) {
   const lines: BootLine[] = [
     { k: 'cmd', t: '$ ssh root@parrainage.sji' },
     { k: 'out', t: '> connexion établie · TLS 1.3 · clé ed25519' },
     { k: 'cmd', t: '$ npm run parrainage -- --promo=ING3' },
+    { k: 'out', t: `> session : ${session}` },
     { k: 'cmt', t: '// Saint Jean Ingénieur · programme de parrainage' },
   ];
   const [shown, setShown] = useState(0);
