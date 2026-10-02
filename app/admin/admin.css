@@ -209,3 +209,14 @@
 /* Boîte de dialogue (modification d'un étudiant) */
 .adm-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; background: rgba(15, 23, 42, .35); }
 .adm-modal-box { width: min(560px, 100%); max-height: calc(100% - 2rem); overflow-y: auto; box-shadow: 0 30px 80px -30px rgba(15, 23, 42, .6); }
+
+/* Sélection d'un groupe à inviter */
+.adm-select-bar {
+  position: sticky; top: 56px; z-index: 2;
+  display: flex; align-items: center; flex-wrap: wrap; gap: .45rem;
+  padding: .55rem .7rem; border: 1px solid var(--a-line); border-radius: 8px; background: var(--a-panel);
+}
+.adm-select-count { margin-left: auto; font-weight: 600; color: var(--a-accent); }
+.adm-check { width: 28px; }
+.adm-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--a-accent); }
+.adm-table tr.selected td { background: #EFF6FF; }

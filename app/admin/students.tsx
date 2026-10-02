@@ -53,6 +53,33 @@ export default function StudentsPage() {
       return `${fullName(s)} : ${emailSummary(r)}`;
     });
 
+  // ── Sélection d'un groupe d'étudiants à inviter ──
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const setMany = (ids: string[], on: boolean) =>
+    setSelected((cur) => {
+      const next = new Set(cur);
+      ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  const toggle = (id: string) => setMany([id], !selected.has(id));
+  const all = students.data ?? [];
+  const neverInvited = all.filter((s) => !tracking.get(s.id)?.invitation);
+
+  const inviteSelected = () =>
+    run("invite-selected", async () => {
+      const ids = all.filter((s) => selected.has(s.id)).map((s) => s.id);
+      if (!ids.length) return;
+      if (!confirm(`Envoyer une invitation aux ${ids.length} étudiant(s) sélectionné(s) ?\nLes liens encore en attente seront remplacés par un nouveau lien.`)) return;
+      const r = await api.invitations.bulk(ids);
+      void overview.reload();
+      setSelected(new Set());
+      if (r.failed.length) {
+        setNotice({ kind: "error", text: `${r.sent}/${r.total} invitation(s) envoyée(s). Échecs : ${r.failed.map((f) => f.email).join(", ")} — ${r.failed[0].reason}` });
+        return;
+      }
+      return `${r.sent} invitation(s) envoyée(s) au groupe sélectionné.`;
+    });
+
   const inviteAll = () =>
     run("invite-all", async () => {
       if (!confirm(`Envoyer une invitation aux ${incomplete.length} étudiants dont le profil est incomplet ?`)) return;
@@ -96,6 +123,27 @@ export default function StudentsPage() {
         {students.loading && !students.data && <p className="adm-muted">Chargement…</p>}
 
         {students.data && (
+          <div className="adm-select-bar">
+            <span className="adm-muted small">Cocher :</span>
+            <button className="adm-btn small" onClick={() => setMany(neverInvited.map((s) => s.id), true)} disabled={!neverInvited.length}>
+              jamais invités ({neverInvited.length})
+            </button>
+            <button className="adm-btn small" onClick={() => setMany(incomplete.map((s) => s.id), true)} disabled={!incomplete.length}>
+              profils incomplets ({incomplete.length})
+            </button>
+            {selected.size > 0 && (
+              <>
+                <span className="adm-select-count">{selected.size} sélectionné(s)</span>
+                <button className="adm-btn small primary" onClick={inviteSelected} disabled={busy !== null}>
+                  {busy === "invite-selected" ? "Envoi…" : `Envoyer l'invitation (${selected.size})`}
+                </button>
+                <button className="adm-btn small" onClick={() => setSelected(new Set())}>Tout décocher</button>
+              </>
+            )}
+          </div>
+        )}
+
+        {students.data && (
           <div className="adm-columns">
             <StudentTable
               title="ING4 · Parrains"
@@ -104,6 +152,9 @@ export default function StudentsPage() {
               busy={busy}
               onInvite={invite}
               onEdit={setEditing}
+              selected={selected}
+              onToggle={toggle}
+              onToggleMany={setMany}
               tracking={tracking}
               onUpdated={replace}
               setNotice={setNotice}
@@ -115,6 +166,9 @@ export default function StudentsPage() {
               busy={busy}
               onInvite={invite}
               onEdit={setEditing}
+              selected={selected}
+              onToggle={toggle}
+              onToggleMany={setMany}
               tracking={tracking}
               onUpdated={replace}
               setNotice={setNotice}
@@ -442,6 +496,9 @@ function StudentTable({
   busy,
   onInvite,
   onEdit,
+  selected,
+  onToggle,
+  onToggleMany,
   tracking,
   onUpdated,
   setNotice,
@@ -452,6 +509,9 @@ function StudentTable({
   busy: string | null;
   onInvite: (s: Student, resend: boolean) => void;
   onEdit: (s: Student) => void;
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onToggleMany: (ids: string[], on: boolean) => void;
   tracking: Map<string, InvitationOverview["students"][number]>;
   onUpdated: (s: Student) => void;
   setNotice: (n: Notice) => void;
@@ -481,6 +541,17 @@ function StudentTable({
         <table className="adm-table">
           <thead>
             <tr>
+              <th className="adm-check">
+                <input
+                  type="checkbox"
+                  aria-label={`Tout cocher : ${title}`}
+                  checked={rows.length > 0 && rows.every((s) => selected.has(s.id))}
+                  ref={(el) => {
+                    if (el) el.indeterminate = rows.some((s) => selected.has(s.id)) && !rows.every((s) => selected.has(s.id));
+                  }}
+                  onChange={(e) => onToggleMany(rows.map((s) => s.id), e.target.checked)}
+                />
+              </th>
               <th />
               <th>Nom</th>
               {level === "ING4" && <th title="Nombre maximum de filleuls">Max</th>}
@@ -492,7 +563,10 @@ function StudentTable({
             {rows.map((s) => {
               const complete = profileComplete(s);
               return (
-                <tr key={s.id}>
+                <tr key={s.id} className={selected.has(s.id) ? "selected" : undefined}>
+                  <td className="adm-check">
+                    <input type="checkbox" aria-label={`Sélectionner ${fullName(s)}`} checked={selected.has(s.id)} onChange={() => onToggle(s.id)} />
+                  </td>
                   <td className="adm-avatar">
                     {s.profilePictureUrl ? <img src={s.profilePictureUrl} alt="" /> : <span>{s.firstName[0]}</span>}
                   </td>
