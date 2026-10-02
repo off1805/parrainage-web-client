@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { describeError } from "../lib/errors";
 import type { ImportResult, InvitationOverview, InvitationResult, Student, StudentLevel } from "../lib/types";
@@ -14,6 +14,7 @@ function emailSummary(r: InvitationResult) {
 export default function StudentsPage() {
   const section = useSection();
   const students = useLoad(() => api.students.list({ section }));
+  const [editing, setEditing] = useState<Student | null>(null);
   const overview = useLoad(() => api.invitations.overview());
   const tracking = useMemo(
     () => new Map((overview.data?.students ?? []).map((o) => [o.studentId, o])),
@@ -102,6 +103,7 @@ export default function StudentsPage() {
               rows={byLevel("ING4")}
               busy={busy}
               onInvite={invite}
+              onEdit={setEditing}
               tracking={tracking}
               onUpdated={replace}
               setNotice={setNotice}
@@ -112,6 +114,7 @@ export default function StudentsPage() {
               rows={byLevel("ING3")}
               busy={busy}
               onInvite={invite}
+              onEdit={setEditing}
               tracking={tracking}
               onUpdated={replace}
               setNotice={setNotice}
@@ -119,6 +122,18 @@ export default function StudentsPage() {
           </div>
         )}
       </section>
+      {editing && (
+        <EditStudentDialog
+          student={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(updated) => {
+            setEditing(null);
+            setNotice({ kind: "ok", text: `${fullName(updated)} : informations mises à jour.` });
+            // Un changement de section peut le faire sortir de la liste affichée
+            students.reload();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -156,6 +171,99 @@ function MailStatus({ info }: { info?: InvitationOverview["students"][number] })
     <div className="adm-mail" title={info.delivery?.reason ?? undefined}>
       <span className="adm-muted small">{INVITATION[inv.status.toUpperCase()] ?? inv.status} · {formatDate(inv.sentAt)}</span>
       {d && <span className={`adm-badge ${d.kind}`}>{d.label}</span>}
+    </div>
+  );
+}
+
+/* ── Modification d'un étudiant ── */
+
+function EditStudentDialog({ student, onClose, onSaved }: {
+  student: Student; onClose: () => void; onSaved: (s: Student) => void;
+}) {
+  const initial = {
+    firstName: student.firstName,
+    lastName: student.lastName,
+    email: student.email,
+    matricule: student.matricule ?? "",
+    whatsapp: student.whatsapp ?? "",
+    level: student.level,
+    section: student.section,
+    maxMentees: String(student.maxMentees ?? 2),
+  };
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const set = (k: keyof typeof initial) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    // N'envoie que ce qui a changé
+    const patch: Parameters<typeof api.students.update>[1] = {};
+    (["firstName", "lastName", "email", "matricule", "whatsapp"] as const).forEach((k) => {
+      if (form[k].trim() !== initial[k]) patch[k] = form[k].trim();
+    });
+    if (form.level !== initial.level) patch.level = form.level;
+    if (form.section !== initial.section) patch.section = form.section;
+    if (form.level === "ING4" && (form.maxMentees !== initial.maxMentees || form.level !== initial.level)) {
+      patch.maxMentees = Number(form.maxMentees);
+    }
+    if (!Object.keys(patch).length) return onClose();
+
+    setSaving(true);
+    setError("");
+    try {
+      onSaved(await api.students.update(student.id, patch));
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="adm-modal" role="dialog" aria-modal="true" aria-label={`Modifier ${fullName(student)}`} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form className="adm-panel adm-modal-box" onSubmit={submit}>
+        <div className="adm-panel-head">
+          <h2>Modifier {fullName(student)}</h2>
+          <button type="button" className="adm-link" onClick={onClose} aria-label="Fermer">×</button>
+        </div>
+        <div className="adm-form-grid">
+          <label className="adm-field"><span>Prénom</span><input className="adm-input" required maxLength={100} value={form.firstName} onChange={set("firstName")} /></label>
+          <label className="adm-field"><span>Nom</span><input className="adm-input" required maxLength={100} value={form.lastName} onChange={set("lastName")} /></label>
+          <label className="adm-field wide"><span>Email</span><input className="adm-input" type="email" required maxLength={255} value={form.email} onChange={set("email")} /></label>
+          <label className="adm-field"><span>Matricule</span><input className="adm-input" maxLength={50} value={form.matricule} onChange={set("matricule")} /></label>
+          <label className="adm-field"><span>WhatsApp</span><input className="adm-input" maxLength={32} placeholder="+2376XXXXXXXX" value={form.whatsapp} onChange={set("whatsapp")} /></label>
+          <label className="adm-field">
+            <span>Niveau</span>
+            <select className="adm-input" value={form.level} onChange={set("level")}>
+              <option value="ING3">ING3 · filleul</option>
+              <option value="ING4">ING4 · parrain</option>
+            </select>
+          </label>
+          <label className="adm-field">
+            <span>Section</span>
+            <select className="adm-input" value={form.section} onChange={set("section")}>
+              <option value="FR">{SECTION_LABEL.FR}</option>
+              <option value="EN">{SECTION_LABEL.EN}</option>
+            </select>
+          </label>
+          {form.level === "ING4" && (
+            <label className="adm-field"><span>Filleuls max</span><input className="adm-input" type="number" min={1} max={50} required value={form.maxMentees} onChange={set("maxMentees")} /></label>
+          )}
+        </div>
+        {error && <p className="adm-error small">{error}</p>}
+        <div className="adm-row">
+          <button className="adm-btn primary" disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
+          <button type="button" className="adm-btn" onClick={onClose}>Annuler</button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -333,6 +441,7 @@ function StudentTable({
   rows,
   busy,
   onInvite,
+  onEdit,
   tracking,
   onUpdated,
   setNotice,
@@ -342,6 +451,7 @@ function StudentTable({
   rows: Student[];
   busy: string | null;
   onInvite: (s: Student, resend: boolean) => void;
+  onEdit: (s: Student) => void;
   tracking: Map<string, InvitationOverview["students"][number]>;
   onUpdated: (s: Student) => void;
   setNotice: (n: Notice) => void;
@@ -407,6 +517,7 @@ function StudentTable({
                     <span className={`adm-badge ${complete ? "ok" : "pending"}`}>{complete ? "Complet" : "Incomplet"}</span>
                   </td>
                   <td className="adm-actions">
+                    <button className="adm-btn small" onClick={() => onEdit(s)}>Modifier</button>
                     <button className="adm-btn small" disabled={busy !== null} onClick={() => onInvite(s, false)}>
                       {busy === `send-${s.id}` ? "…" : "Envoyer"}
                     </button>

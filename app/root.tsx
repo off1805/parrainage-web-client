@@ -7,7 +7,9 @@ import {
   ScrollRestoration,
 } from "react-router";
 
+import { useEffect } from "react";
 import type { Route } from "./+types/root";
+import { startKeepAlive } from "./lib/keepAlive";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -44,6 +46,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  // Maintient le backend éveillé tant que l'application est ouverte
+  useEffect(() => startKeepAlive(), []);
   return <Outlet />;
 }
 

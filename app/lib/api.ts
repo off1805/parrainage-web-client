@@ -13,7 +13,8 @@ import type {
   StudentSection,
 } from './types';
 
-const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+export const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const BASE = API_BASE;
 
 export class ApiError extends Error {
   constructor(
@@ -88,7 +89,8 @@ export const api = {
     get: (id: string) => request<Student>(`/students/${id}`),
     create: (payload: { firstName: string; lastName: string; email: string; matricule?: string; level: StudentLevel; section: StudentSection; maxMentees?: number }) =>
       request<Student>('/students', { method: 'POST', body: payload }),
-    update: (id: string, patch: Partial<Omit<Student, 'id' | 'email' | 'level' | 'createdAt' | 'updatedAt'>>) => request<Student>(`/students/${id}`, { method: 'PATCH', body: patch }),
+    /** Champs texte vides (matricule, WhatsApp) : effacés. */
+    update: (id: string, patch: Partial<Omit<Student, 'id' | 'createdAt' | 'updatedAt' | 'matricule' | 'whatsapp'>> & { matricule?: string; whatsapp?: string }) => request<Student>(`/students/${id}`, { method: 'PATCH', body: patch }),
     import: (file: File, options: { level?: StudentLevel; section?: StudentSection; maxMentees?: number } = {}) => {
       const fd = new FormData();
       fd.append('file', file);
