@@ -65,6 +65,18 @@ export default function StudentsPage() {
   const all = students.data ?? [];
   const neverInvited = all.filter((s) => !tracking.get(s.id)?.invitation);
 
+  const removeStudent = (s: Student) =>
+    run(`remove-${s.id}`, async () => {
+      if (!confirm(`Retirer ${fullName(s)} du parrainage ?\n\nSes invitations et contraintes seront supprimées. Si un tirage non finalisé l'inclut, ce tirage sera annulé et devra être relancé.\nCette action est définitive.`)) return;
+      const r = await api.students.remove(s.id);
+      setMany([s.id], false);
+      students.reload();
+      void overview.reload();
+      return r.resetSessions
+        ? `${fullName(s)} a été retiré(e). ${r.resetSessions} tirage(s) non finalisé(s) annulé(s) : relance le tirage dans l'onglet Sessions.`
+        : `${fullName(s)} a été retiré(e).`;
+    });
+
   const inviteSelected = () =>
     run("invite-selected", async () => {
       const ids = all.filter((s) => selected.has(s.id)).map((s) => s.id);
@@ -152,6 +164,7 @@ export default function StudentsPage() {
               busy={busy}
               onInvite={invite}
               onEdit={setEditing}
+              onRemove={removeStudent}
               selected={selected}
               onToggle={toggle}
               onToggleMany={setMany}
@@ -166,6 +179,7 @@ export default function StudentsPage() {
               busy={busy}
               onInvite={invite}
               onEdit={setEditing}
+              onRemove={removeStudent}
               selected={selected}
               onToggle={toggle}
               onToggleMany={setMany}
@@ -498,6 +512,7 @@ function StudentTable({
   busy,
   onInvite,
   onEdit,
+  onRemove,
   selected,
   onToggle,
   onToggleMany,
@@ -511,6 +526,7 @@ function StudentTable({
   busy: string | null;
   onInvite: (s: Student, resend: boolean) => void;
   onEdit: (s: Student) => void;
+  onRemove: (s: Student) => void;
   selected: Set<string>;
   onToggle: (id: string) => void;
   onToggleMany: (ids: string[], on: boolean) => void;
@@ -595,6 +611,9 @@ function StudentTable({
                   </td>
                   <td className="adm-actions">
                     <button className="adm-btn small" onClick={() => onEdit(s)}>Modifier</button>
+                    <button className="adm-btn small danger" disabled={busy !== null} onClick={() => onRemove(s)} title="Retirer cet étudiant du parrainage">
+                      {busy === `remove-${s.id}` ? "…" : "Retirer"}
+                    </button>
                     <button className="adm-btn small" disabled={busy !== null} onClick={() => onInvite(s, false)}>
                       {busy === `send-${s.id}` ? "…" : "Envoyer"}
                     </button>

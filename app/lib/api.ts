@@ -87,6 +87,8 @@ export const api = {
       return request<Student[]>(`/students${qs ? '?' + qs : ''}`);
     },
     get: (id: string) => request<Student>(`/students/${id}`),
+    /** Retire un étudiant ; `resetSessions` = tirages non finalisés annulés. */
+    remove: (id: string) => request<{ deleted: true; resetSessions: number }>(`/students/${id}`, { method: 'DELETE' }),
     create: (payload: { firstName: string; lastName: string; email: string; matricule?: string; level: StudentLevel; section: StudentSection; maxMentees?: number }) =>
       request<Student>('/students', { method: 'POST', body: payload }),
     /** Champs texte vides (matricule, WhatsApp) : effacés. */
