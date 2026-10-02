@@ -179,6 +179,7 @@ export default function SessionsPage() {
             {view.pairings.length === 0 ? (
               <p className="adm-muted">Pas encore de tirage.</p>
             ) : (
+              <div className="adm-table-wrap">
               <table className="adm-table">
                 <thead>
                   <tr><th>Parrain (ING4)</th><th>Filleul (ING3)</th><th>Origine</th></tr>
@@ -195,6 +196,7 @@ export default function SessionsPage() {
                     ))}
                 </tbody>
               </table>
+              </div>
             )}
           </>
         )}

@@ -103,6 +103,7 @@ export default function ConstraintsPage() {
               {rows.length === 0 ? (
                 <p className="adm-muted">Aucune.</p>
               ) : (
+                <div className="adm-table-wrap">
                 <table className="adm-table">
                   <thead>
                     <tr><th>Parrain</th><th>Filleul</th><th>Raison</th><th>Créée</th><th /></tr>
@@ -123,6 +124,7 @@ export default function ConstraintsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </section>
           );

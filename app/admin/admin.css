@@ -124,6 +124,11 @@
 .adm-link { background: none; border: 0; padding: 0 .25rem; cursor: pointer; font-size: 1.1rem; color: inherit; }
 
 .adm-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+/* Les colonnes ne se chevauchent jamais : le tableau garde sa largeur utile
+   et défile horizontalement dans son conteneur si la place manque. */
+.adm-table-wrap { width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.adm-table th, .adm-table td { white-space: nowrap; }
+.adm-table td .small { white-space: nowrap; }
 .adm-table th {
   text-align: left;
   font-weight: 600;
@@ -193,7 +198,6 @@
   .adm-split { grid-template-columns: 1fr; }
   .adm-columns { grid-template-columns: 1fr; }
   .adm-row .adm-input { min-width: 0; flex: 1; }
-  .adm-table { display: block; overflow-x: auto; }
 }
 
 /* Vérification d'identité avant l'admin */
@@ -220,3 +224,6 @@
 .adm-check { width: 28px; }
 .adm-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--a-accent); }
 .adm-table tr.selected td { background: #EFF6FF; }
+
+/* Tableaux d'étudiants empilés : chacun prend toute la largeur */
+.adm-stack { display: flex; flex-direction: column; gap: 1.2rem; min-width: 0; }

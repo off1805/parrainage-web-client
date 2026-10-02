@@ -144,7 +144,7 @@ export default function StudentsPage() {
         )}
 
         {students.data && (
-          <div className="adm-columns">
+          <div className="adm-stack">
             <StudentTable
               title="ING4 · Parrains"
               level="ING4"
@@ -472,6 +472,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
         </div>
       )}
       {result && result.errors.length > 0 && (
+        <div className="adm-table-wrap">
         <table className="adm-table compact">
           <thead>
             <tr><th>Ligne</th><th>Email</th><th>Problème</th></tr>
@@ -482,6 +483,7 @@ function ImportPanel({ onImported }: { onImported: () => void }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </section>
   );
@@ -538,6 +540,7 @@ function StudentTable({
       {rows.length === 0 ? (
         <p className="adm-muted">Aucun étudiant.</p>
       ) : (
+        <div className="adm-table-wrap">
         <table className="adm-table">
           <thead>
             <tr>
@@ -610,6 +613,7 @@ function StudentTable({
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
