@@ -225,5 +225,13 @@
 .adm-check input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--a-accent); }
 .adm-table tr.selected td { background: #EFF6FF; }
 
-/* Tableaux d'étudiants empilés : chacun prend toute la largeur */
-.adm-stack { display: flex; flex-direction: column; gap: 1.2rem; min-width: 0; }
+/* Listes ING4 et ING3 côte à côte, séparées par un trait ; chacune défile
+   horizontalement si ses colonnes ne tiennent pas (jamais de chevauchement). */
+.adm-lists { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
+.adm-lists > .adm-col { padding: 0 1rem; }
+.adm-lists > .adm-col:first-child { padding-left: 0; border-right: 1px solid var(--a-line); }
+.adm-lists > .adm-col:last-child { padding-right: 0; }
+@media (max-width: 900px) {
+  .adm-lists { grid-template-columns: minmax(0, 1fr); gap: 1.2rem; }
+  .adm-lists > .adm-col { padding: 0; border-right: 0 !important; }
+}

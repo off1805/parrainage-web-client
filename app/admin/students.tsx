@@ -144,7 +144,7 @@ export default function StudentsPage() {
         )}
 
         {students.data && (
-          <div className="adm-stack">
+          <div className="adm-columns adm-lists">
             <StudentTable
               title="ING4 · Parrains"
               level="ING4"
