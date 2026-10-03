@@ -87,6 +87,23 @@ export default function SessionsPage() {
       return "Session finalisée.";
     });
 
+  const removeSession = (s: PairingSessionView) =>
+    run("remove", async () => {
+      const label = `la session du ${formatDate(s.createdAt)}`;
+      if (s.status === "FINALIZED") {
+        const typed = prompt(`${label[0].toUpperCase()}${label.slice(1)} est FINALISÉE : c'est un résultat officiel.\nSes ${s.pairings.length} binôme(s) seront définitivement supprimés.\n\nTape SUPPRIMER pour confirmer.`);
+        if (typed?.trim().toUpperCase() !== "SUPPRIMER") return;
+      } else if (!confirm(`Supprimer ${label} et ses ${s.pairings.length} binôme(s) ?\nLes étudiants et les contraintes sont conservés.`)) {
+        return;
+      }
+      await api.sessions.remove(s.id);
+      // Recharger la liste avant de changer la sélection, pour ne pas rouvrir la session supprimée
+      await sessions.reload();
+      setView(null);
+      setSelectedId(null);
+      return "Session supprimée.";
+    });
+
   const exportXlsx = (id: string) =>
     run("export", async () => {
       await api.sessions.downloadExport(id);
@@ -160,6 +177,9 @@ export default function SessionsPage() {
               {view.pairings.length > 0 && (
                 <Link className="adm-btn" to={`/show?session=${view.id}`} target="_blank">Ouvrir le show de cette session ↗</Link>
               )}
+              <button className="adm-btn danger" onClick={() => removeSession(view)} disabled={busy !== null}>
+                {busy === "remove" ? "…" : "Supprimer la session"}
+              </button>
             </div>
 
             {report && <ReportBox report={report} />}

@@ -138,6 +138,8 @@ export const api = {
     validate: (id: string) => request<PairingValidationReport>(`/pairing-sessions/${id}/validate`, { method: 'POST' }),
     generate: (id: string) => request<PairingSessionView>(`/pairing-sessions/${id}/generate`, { method: 'POST' }),
     regenerate: (id: string) => request<PairingSessionView>(`/pairing-sessions/${id}/regenerate`, { method: 'POST' }),
+    /** Supprime la session et ses binômes (étudiants et contraintes conservés). */
+    remove: (id: string) => request<void>(`/pairing-sessions/${id}`, { method: 'DELETE' }),
     finalize: (id: string) => request<PairingSessionView>(`/pairing-sessions/${id}/finalize`, { method: 'POST' }),
     exportBlob: (id: string) => request<Blob>(`/pairing-sessions/${id}/export`),
     downloadExport: async (id: string) => {
