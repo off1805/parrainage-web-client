@@ -20,7 +20,7 @@ const TABS = [
  * réponse attendue figure dans le code. C'est un garde-fou côté navigateur, pas une
  * sécurité : l'API reste accessible sans authentification.
  */
-const ANSWER_SHA256 = "e8db7939f833383b7d6c12aa531614044cad8a3b980d6f0bf4642b2a1c36f922";
+const ANSWER_SHA256 = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8";
 const STORAGE_KEY = "admin-identity-ok";
 const SECTION_KEY = "admin-section";
 
